@@ -6,24 +6,20 @@ from PIL import Image
 from docx import Document
 from docx.shared import Inches
 import google.generativeai as genai
-from dotenv import load_dotenv
 from tensorflow.keras.models import load_model
 import numpy as np
-import streamlit as st
-api_key = st.secrets["GEMINI_API_KEY"]
-# Charger le modèle CNN entraîné
-cnn_model = load_model("models\resnet50v2_ecg_best_model.h5")
 
-# Classes (à adapter selon ton dataset)
+# === CHARGER LE MODÈLE CNN ===
+MODEL_PATH = "models/resnet50v2_ecg_best_model.h5"
+resnet50v2_model = load_model(MODEL_PATH)
+
+# === CLASSES DU DATASET ===
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
 
-# Charger les variables d'environnement
+# === CONFIGURATION DE GEMINI ===
 api_key = st.secrets["GEMINI_API_KEY"]
-if api_key is None:
-    raise ValueError("GEMINI_API_KEY is not set in environment variables")
 genai.configure(api_key=api_key)
 
-# Paramètres du modèle
 generation_config = {
     "temperature": 1,
     "top_p": 0.95,
@@ -33,18 +29,20 @@ generation_config = {
 }
 
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro",
+    model_name="gemini-1.5-flash",
     generation_config=generation_config,
 )
+
+# === PREDICTION DU MODÈLE CNN ===
 def predict_ecg_class(image_file):
-    image = Image.open(image_file).convert('RGB').resize((224, 224))  
+    image = Image.open(image_file).convert('RGB').resize((224, 224))
     image_array = np.array(image) / 255.0
-    image_array = np.expand_dims(image_array, axis=0)  
-    prediction = cnn_model.predict(image_array)
+    image_array = np.expand_dims(image_array, axis=0)
+    prediction = resnet50v2_model.predict(image_array)
     predicted_class = class_labels[np.argmax(prediction)]
     return predicted_class
 
-# Fonction pour analyser une image ECG et générer un rapport
+# === GÉNÉRATION DU RAPPORT PAR GEMINI ===
 def generate_ecg_details(ecg_image):
     image = Image.open(ecg_image)
     current_date = datetime.now().strftime('%Y-%m-%d')
@@ -110,11 +108,11 @@ def generate_ecg_details(ecg_image):
 
     chat_session = model.start_chat(history=[])
     predicted_class = predict_ecg_class(ecg_image)
-    full_prompt = prompt + f"\n\n**Anomaly Class (Predicted by Our Model):** {predicted_class}\n\nNow complete the rest of the report using the above prediction as reference."
+    full_prompt = prompt + f"\n\n**Anomaly Class (Predicted by Our Resnet50v2 Model):** {predicted_class}\n\nNow complete the rest of the report using the above prediction as reference."
     response = chat_session.send_message([full_prompt, image])
     return response.text
 
-# Fonction pour créer un document Word contenant le rapport ECG
+# === CRÉATION DU DOCUMENT WORD ===
 def create_doc(report_text, ecg_image):
     doc = Document()
     doc.add_heading('ECG ANALYSIS REPORT', 0)
@@ -138,11 +136,10 @@ def create_doc(report_text, ecg_image):
     file_stream.seek(0)
     return file_stream
 
-# Interface utilisateur avec Streamlit
+# === INTERFACE STREAMLIT ===
 def main():
     st.title("🫀Heart Health Chatbot - Get Instant ECG Analysis")
 
-    # Section Upload ECG
     st.header("Upload ECG Image")
     ecg_image = st.file_uploader("Upload an ECG Image", type=["png", "jpg", "jpeg"])
 
@@ -154,11 +151,8 @@ def main():
                 ecg_details = generate_ecg_details(ecg_image)
             st.header("Generated ECG Report")
             st.markdown(ecg_details)
-
-            # Stocker le rapport dans la session pour le téléchargement
             st.session_state.ecg_details = ecg_details
 
-        # Bouton de téléchargement du rapport
         if hasattr(st.session_state, 'ecg_details'):
             doc_file_stream = create_doc(st.session_state.ecg_details, ecg_image)
             st.download_button(
@@ -168,22 +162,18 @@ def main():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-    # Section Chatbot IA
-    st.header("Ask Your AI Cardiologist ")
+    st.header("Ask Your AI Cardiologist")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Afficher l'historique du chat
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Saisie utilisateur
     user_input = st.chat_input("Ask me anything...")
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
-        
         with st.chat_message("user"):
             st.markdown(user_input)
 
@@ -193,7 +183,6 @@ def main():
             bot_response = response.text
 
         st.session_state.messages.append({"role": "assistant", "content": bot_response})
-
         with st.chat_message("assistant"):
             st.markdown(bot_response)
 
