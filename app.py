@@ -9,17 +9,15 @@ import requests
 import google.generativeai as genai
 from tensorflow.keras.models import load_model
 import numpy as np
+import gdown
 
-# ====================== 🔗 TÉLÉCHARGER LE MODÈLE .h5 DEPUIS GOOGLE DRIVE ======================
-MODEL_URL = "https://drive.google.com/uc?export=download&id=1eKr99KnLguPw4N0rcPb4h2Ei42Qbkapa"
 MODEL_PATH = "resnet50v2_ecg_best_model.h5"
+drive_id = "1eKr99KnLguPw4N0rcPb4h2Ei42Qbkapa"
+gdown_url = f"https://drive.google.com/uc?id={drive_id}"
 
 if not os.path.exists(MODEL_PATH):
-    print("📥 Téléchargement du modèle depuis Google Drive...")
-    response = requests.get(MODEL_URL)
-    with open(MODEL_PATH, "wb") as f:
-        f.write(response.content)
-    print("✅ Modèle téléchargé avec succès.")
+    st.info("Downloading the model from Google Drive...")
+    gdown.download(gdown_url, MODEL_PATH, quiet=False)
 
 # ====================== 🧠 CHARGER LE MODÈLE ======================
 resnet50v2_model = load_model(MODEL_PATH)
