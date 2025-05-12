@@ -12,7 +12,7 @@ import numpy as np
 import streamlit as st
 api_key = st.secrets["GEMINI_API_KEY"]
 # Charger le modèle CNN entraîné
-cnn_model = load_model("resnet50v2_ecg_best_model.h5")
+cnn_model = load_model("models/resnet50v2_ecg_best_model.h5")
 
 # Classes (à adapter selon ton dataset)
 class_labels = ['Abnormal', 'Covid-19', 'Normal', 'MI', 'HMI', 'AHB']
