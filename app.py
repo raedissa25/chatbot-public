@@ -28,11 +28,10 @@ class_labels = ['AHB', 'HMI', 'MI', 'Normal']
 # -----------------------------
 # 🔹 Charger les variables d'environnement
 # -----------------------------
-load_dotenv("C:\\Users\\21629\\Desktop\\chatbot for image classification CNN(perfect finale)\\env")
-api_key = os.getenv("GEMINI_API_KEY")
-
+api_key = st.secrets["GEMINI_API_KEY"]
 if api_key is None:
     raise ValueError("GEMINI_API_KEY is not set in environment variables")
+genai.configure(api_key=api_key)
 
 # 🔹 Configurer le modèle Gemini
 genai.configure(api_key=api_key)
