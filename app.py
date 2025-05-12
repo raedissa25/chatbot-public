@@ -1,40 +1,17 @@
 import os
-from datetime import datetime
 import streamlit as st
-from io import BytesIO
-from PIL import Image
-from docx import Document
-from docx.shared import Inches
-import google.generativeai as genai
+import pandas as pd
 import numpy as np
-import requests
+import matplotlib.pyplot as plt
+import google.generativeai as genai
 from tensorflow.keras.models import load_model
-
-# Classes de prédiction
-class_labels = ['AHB', 'HMI', 'MI', 'Normal']
-
-# Téléchargement du modèle depuis Google Drive
-@st.cache_resource
-def download_and_load_model():
-    file_id = "1eKr99KnLguPw4N0rcPb4h2Ei42Qbkapa"
-    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    local_model_path = "resnet50v2_ecg_best_model.h5"
-
-    if not os.path.exists(local_model_path):
-        with st.spinner("Downloading model..."):
-            response = requests.get(download_url, stream=True)
-            with open(local_model_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-    return load_model(local_model_path)
-
-resnet50v2_model = download_and_load_model()
-
-# Configuration Gemini via secrets
+import streamlit as st
 api_key = st.secrets["GEMINI_API_KEY"]
+if api_key is None:
+    raise ValueError("GEMINI_API_KEY is not set in environment variables")
 genai.configure(api_key=api_key)
 
+# Configuration Gemini
 generation_config = {
     "temperature": 1,
     "top_p": 0.95,
@@ -42,138 +19,83 @@ generation_config = {
     "max_output_tokens": 8192,
     "response_mime_type": "text/plain",
 }
-
 model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
     generation_config=generation_config,
 )
 
-def predict_ecg_class(image_file):
-    image = Image.open(image_file).convert('RGB').resize((224, 224))
-    image_array = np.array(image) / 255.0
-    image_array = np.expand_dims(image_array, axis=0)
-    prediction = resnet50v2_model.predict(image_array)
-    predicted_class = class_labels[np.argmax(prediction)]
-    return predicted_class
+# Charger le modèle CNN
+MODEL_PATH = "models/resnet50v2_ecg_best_model.h5"
+cnn_model = load_model(MODEL_PATH)
 
-def generate_ecg_details(ecg_image):
-    image = Image.open(ecg_image)
-    current_date = datetime.now().strftime('%Y-%m-%d')
+# Dictionnaire des classes
+classes = {
+    0: ("Normal (N)", "Battement cardiaque normal (rythme sinusal normal)."),
+    1: ("Extrasystole ventriculaire (VEB / PVC)", "Battement prématuré provenant des ventricules."),
+    2: ("Battements supraventriculaires (SVEB)", "Battements prématurés provenant des oreillettes."),
+    3: ("Fusion de battements (F)", "Fusion entre un battement normal et un VEB."),
+    4: ("Battements inconnus (Q)", "Battements non classifiés dans les catégories précédentes."),
+}
 
-    prompt = f"""Analyze this ECG image and provide a detailed report. Follow this structure:
+# Prétraitement des données ECG
+def preprocess_ecg(csv_file):
+    df = pd.read_csv(csv_file, header=None)
+    if df.shape[1] != 188:
+        st.error("Le fichier CSV doit contenir exactement 188 colonnes.")
+        return None
+    ecg_signal = df.iloc[:, :-1].values  # shape (samples, 187)
+    ecg_data = np.expand_dims(ecg_signal, axis=-1)  # shape (samples, 187, 1)
+    return ecg_data
 
-**ECG ANALYSIS REPORT**
+# Tracer un signal ECG
+def plot_ecg_signal(signal, title="ECG Signal (1er échantillon)"):
+    fig, ax = plt.subplots(figsize=(10, 3))
+    ax.plot(signal, color='dodgerblue')
+    ax.set_title(title)
+    ax.set_xlabel("Temps (échantillons)")
+    ax.set_ylabel("Amplitude")
+    ax.grid(True)
+    st.pyplot(fig)
 
-**1. PATIENT INFORMATION:**
-- Name:
-- Age:
-- Gender:
-- ID Number:
-- Date of ECG:
-
-**2. CLINICAL INFORMATION:**
-- Reason for ECG:
-- Relevant Medical History:
-- Medications:
-
-**3. ECG TECHNICAL DETAILS:**
-- ECG Machine Used:
-- Lead Configuration:
-- Calibration:
-- Recording Quality:
-
-**4. ECG FINDINGS:**
-**Rhythm and Rate:**
-- Heart Rate:
-- Rhythm:
-- P Waves:
-- PR Interval:
-- QRS Complex:
-- QT/QTc Interval:
-- ST Segment:
-- T Waves:
-
-**Axis:**
-- P Wave Axis:
-- QRS Axis:
-- T Wave Axis:
-
-**Conduction and Morphology:**
-- Atrial Conduction:
-- Ventricular Conduction:
-- QRS Morphology:
-- ST-T Changes:
-
-**5. INTERPRETATION:**
-- Normal or Abnormal:
-- Diagnosis/Findings:
-- Comparison with Previous ECG (if available):
-
-**6. CONCLUSION AND RECOMMENDATIONS:**
-- Summary:
-- Recommendations:
-
-**7. REPORTING CARDIOLOGIST:**
-- Name:
-- Signature: Unable to provide signature for AI-generated report.
-- Date of Report: {current_date}
-"""
-
+# Obtenir réponse IA
+def get_bot_response(user_input):
     chat_session = model.start_chat(history=[])
-    predicted_class = predict_ecg_class(ecg_image)
-    full_prompt = prompt + f"\n\n**Anomaly Class (Predicted by Our Resnet50v2 Model):** {predicted_class}\n\nNow complete the rest of the report using the above prediction as reference."
-    response = chat_session.send_message([full_prompt, image])
+    response = chat_session.send_message(user_input)
     return response.text
 
-def create_doc(report_text, ecg_image):
-    doc = Document()
-    doc.add_heading('ECG ANALYSIS REPORT', 0)
-
-    for line in report_text.split("\n"):
-        if line.strip() == '':
-            continue
-        if line.startswith('**') and line.endswith('**'):
-            doc.add_heading(line.strip('**'), level=1)
-        elif line.startswith('-'):
-            doc.add_paragraph(line.strip(), style='List Bullet')
-        else:
-            doc.add_paragraph(line.strip())
-
-    doc.add_heading('ECG Tracing:', level=1)
-    image_stream = BytesIO(ecg_image.getvalue())
-    doc.add_picture(image_stream, width=Inches(6))
-
-    file_stream = BytesIO()
-    doc.save(file_stream)
-    file_stream.seek(0)
-    return file_stream
-
+# App Streamlit
 def main():
-    st.title("🫀Heart Health Chatbot - Get Instant ECG Analysis")
+    st.title("🫀 Assistant Médical Cardiaque")
 
-    st.header("Upload ECG Image")
-    ecg_image = st.file_uploader("Upload an ECG Image", type=["png", "jpg", "jpeg"])
+    # Upload du fichier ECG
+    st.header("📂 téléverser un fichier CSV ECG pour l'analyse")
+    uploaded_file = st.file_uploader("téléverser un fichier CSV", type=["csv"])
 
-    if ecg_image is not None:
-        st.image(ecg_image, caption='Uploaded ECG Image', use_column_width=True)
+    if uploaded_file is not None:
+        st.success("✅ Fichier uploadé avec succès !")
 
-        if st.button("Generate ECG Report"):
-            with st.spinner("Analyzing ECG image..."):
-                ecg_details = generate_ecg_details(ecg_image)
-            st.header("Generated ECG Report")
-            st.markdown(ecg_details)
-            st.session_state.ecg_details = ecg_details
+        ecg_input = preprocess_ecg(uploaded_file)
+        if ecg_input is not None:
+            st.subheader("📈 Aperçu du signal ECG")
+            plot_ecg_signal(ecg_input[0].squeeze())
 
-        if hasattr(st.session_state, 'ecg_details'):
-            doc_file_stream = create_doc(st.session_state.ecg_details, ecg_image)
-            st.download_button(
-                label="Download ECG Report",
-                data=doc_file_stream,
-                file_name="ECG_Report.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            # Prédiction CNN
+            prediction = cnn_model.predict(ecg_input)
+            predicted_class_idx = np.argmax(prediction, axis=1)[0]
+            class_name, class_description = classes[predicted_class_idx]
 
-    st.header("Ask Your AI Cardiologist")
+            st.subheader("✅ Résultat de l'analyse du signal ECG :")
+            st.success(f"Classe prédite : **{class_name}**")
+            st.markdown(f"🔎 *{class_description}*")
+
+            st.subheader("📊 Détail des probabilités pour chaque classe :")
+            for idx, prob in enumerate(prediction[0]):
+                name, desc = classes[idx]
+                st.markdown(f"**{name}** — {desc} : **{prob:.4f}**")
+                st.progress(float(prob))
+
+    # Section Chat IA
+    st.header("💬 Posez une question à votre cardiologue IA")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -182,16 +104,14 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    user_input = st.chat_input("Ask me anything...")
+    user_input = st.chat_input("Posez une question sur le cœur, les anomalies, etc.")
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        with st.spinner("Thinking..."):
-            chat_session = model.start_chat(history=[])
-            response = chat_session.send_message(user_input)
-            bot_response = response.text
+        with st.spinner("Réflexion en cours..."):
+            bot_response = get_bot_response(user_input)
 
         st.session_state.messages.append({"role": "assistant", "content": bot_response})
         with st.chat_message("assistant"):
