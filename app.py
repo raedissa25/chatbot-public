@@ -9,9 +9,15 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from tensorflow.keras.models import load_model
 import numpy as np
+import gdown
+import os
 
-# Charger le modèle CNN entraîné
-resnet50v2_model = load_model("resnet50v2_ecg_best_model.h5")
+model_path = "resnet50v2_ecg_best_model.h5"
+
+if not os.path.exists(model_path):
+    file_id = "TON_FILE_ID"
+    url = f"https://drive.google.com/uc?id={file_id}"
+    gdown.download(url, model_path, quiet=False)
 
 # Classes (à adapter selon ton dataset)
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
