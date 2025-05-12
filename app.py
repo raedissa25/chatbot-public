@@ -26,7 +26,7 @@ model = genai.GenerativeModel(
 
 # Charger le modèle CNN
 MODEL_PATH = "models/resnet50v2_ecg_best_model.h5"
-cnn_model = load_model(MODEL_PATH)
+resnet50v2_model = load_model(MODEL_PATH)
 
 # Dictionnaire des classes
 classes = {
@@ -80,7 +80,7 @@ def main():
             plot_ecg_signal(ecg_input[0].squeeze())
 
             # Prédiction CNN
-            prediction = cnn_model.predict(ecg_input)
+            prediction = resnet50v2_model.predict(ecg_input)
             predicted_class_idx = np.argmax(prediction, axis=1)[0]
             class_name, class_description = classes[predicted_class_idx]
 
