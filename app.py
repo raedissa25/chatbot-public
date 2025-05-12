@@ -11,7 +11,7 @@ from tensorflow.keras.models import load_model
 import numpy as np
 
 # Charger le modèle CNN entraîné
-resnet50v2_model = load_model("C:\\Users\\21629\\Desktop\\Image classification\\modéle Resnet50v2\\resnet50v2_ecg_best_model.h5")
+resnet50v2_model = load_model("resnet50v2_ecg_best_model.h5")
 
 # Classes (à adapter selon ton dataset)
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
