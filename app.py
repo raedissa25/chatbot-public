@@ -5,35 +5,32 @@ from io import BytesIO
 from PIL import Image
 from docx import Document
 from docx.shared import Inches
+import requests
 import google.generativeai as genai
-from dotenv import load_dotenv
 from tensorflow.keras.models import load_model
 import numpy as np
-import gdown
 
-# -----------------------------
-# 🔹 Charger le modèle ResNet50V2
-# -----------------------------
-model_path = "resnet50v2_ecg_best_model.h5"
+# ====================== 🔗 TÉLÉCHARGER LE MODÈLE .h5 DEPUIS GOOGLE DRIVE ======================
+MODEL_URL = "https://drive.google.com/uc?export=download&id=1eKr99KnLguPw4N0rcPb4h2Ei42Qbkapa"
+MODEL_PATH = "resnet50v2_ecg_best_model.h5"
 
-if not os.path.exists(model_path):
-    url = "https://drive.google.com/uc?id=158WctWwqaNYxuuK4KGIll-VMx_4-DODZ"
-    gdown.download(url, model_path, quiet=False)
+if not os.path.exists(MODEL_PATH):
+    print("📥 Téléchargement du modèle depuis Google Drive...")
+    response = requests.get(MODEL_URL)
+    with open(MODEL_PATH, "wb") as f:
+        f.write(response.content)
+    print("✅ Modèle téléchargé avec succès.")
 
-resnet50v2_model = load_model(model_path)
-
-# 🔹 Classes de sortie du modèle
+# ====================== 🧠 CHARGER LE MODÈLE ======================
+resnet50v2_model = load_model(MODEL_PATH)
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
 
-# -----------------------------
-# 🔹 Charger les variables d'environnement
-# -----------------------------
-api_key = st.secrets["GEMINI_API_KEY"]
+# ====================== 🔐 CONFIGURATION GEMINI ======================
+api_key = os.getenv("GEMINI_API_KEY")
 if api_key is None:
-    raise ValueError("GEMINI_API_KEY is not set in environment variables")
+    raise ValueError("❌ GEMINI_API_KEY n'est pas défini dans les variables d'environnement.")
 genai.configure(api_key=api_key)
 
-# 🔹 Configurer le modèle Gemini
 generation_config = {
     "temperature": 1,
     "top_p": 0.95,
@@ -41,17 +38,10 @@ generation_config = {
     "max_output_tokens": 8192,
     "response_mime_type": "text/plain",
 }
+model = genai.GenerativeModel("gemini-1.5-flash", generation_config=generation_config)
 
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    generation_config=generation_config,
-)
-
-# -----------------------------
-# 🔹 Prédiction avec ResNet
-# -----------------------------
+# ====================== 🧠 PRÉDICTION ======================
 def predict_ecg_class(image_file):
-    global resnet50v2_model  # Corrige le NameError
     image = Image.open(image_file).convert('RGB').resize((224, 224))
     image_array = np.array(image) / 255.0
     image_array = np.expand_dims(image_array, axis=0)
@@ -59,9 +49,7 @@ def predict_ecg_class(image_file):
     predicted_class = class_labels[np.argmax(prediction)]
     return predicted_class
 
-# -----------------------------
-# 🔹 Générer le rapport ECG
-# -----------------------------
+# ====================== 📄 GÉNÉRATION DU RAPPORT ======================
 def generate_ecg_details(ecg_image):
     image = Image.open(ecg_image)
     current_date = datetime.now().strftime('%Y-%m-%d')
@@ -131,9 +119,7 @@ def generate_ecg_details(ecg_image):
     response = chat_session.send_message([full_prompt, image])
     return response.text
 
-# -----------------------------
-# 🔹 Générer un document Word
-# -----------------------------
+# ====================== 📤 CRÉER UN RAPPORT WORD ======================
 def create_doc(report_text, ecg_image):
     doc = Document()
     doc.add_heading('ECG ANALYSIS REPORT', 0)
@@ -157,38 +143,35 @@ def create_doc(report_text, ecg_image):
     file_stream.seek(0)
     return file_stream
 
-# -----------------------------
-# 🔹 Interface utilisateur Streamlit
-# -----------------------------
+# ====================== 🎯 INTERFACE STREAMLIT ======================
 def main():
-    st.title("🫀Heart Health Chatbot - Get Instant ECG Analysis")
+    st.set_page_config(page_title="Heart Health Chatbot", layout="centered")
+    st.title("🫀 Heart Health Chatbot - Instant ECG Analysis")
 
-    # Upload image
-    st.header("Upload ECG Image")
+    st.header("📤 Upload ECG Image")
     ecg_image = st.file_uploader("Upload an ECG Image", type=["png", "jpg", "jpeg"])
 
     if ecg_image is not None:
         st.image(ecg_image, caption='Uploaded ECG Image', use_column_width=True)
 
-        if st.button("Generate ECG Report"):
+        if st.button("🧠 Generate ECG Report"):
             with st.spinner("Analyzing ECG image..."):
                 ecg_details = generate_ecg_details(ecg_image)
-            st.header("Generated ECG Report")
+            st.header("📋 Generated ECG Report")
             st.markdown(ecg_details)
-
             st.session_state.ecg_details = ecg_details
 
         if hasattr(st.session_state, 'ecg_details'):
             doc_file_stream = create_doc(st.session_state.ecg_details, ecg_image)
             st.download_button(
-                label="Download ECG Report",
+                label="📄 Download ECG Report",
                 data=doc_file_stream,
                 file_name="ECG_Report.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-    # Chatbot
-    st.header("Ask Your AI Cardiologist")
+    # Chatbot AI Section
+    st.header("💬 Ask Your AI Cardiologist")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -197,7 +180,7 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    user_input = st.chat_input("Ask me anything...")
+    user_input = st.chat_input("Ask me anything about ECG...")
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
