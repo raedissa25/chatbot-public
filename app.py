@@ -18,7 +18,7 @@ if not os.path.exists(model_path):
     file_id = "TON_FILE_ID"
     url = f"https://drive.google.com/file/d/158WctWwqaNYxuuK4KGIll-VMx_4-DODZ/view?usp=drive_link"
     gdown.download(url, model_path, quiet=False)
-
+resnet50v2_model = load_model(model_path)
 # Classes (à adapter selon ton dataset)
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
 
