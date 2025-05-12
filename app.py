@@ -20,12 +20,7 @@ if not os.path.exists(model_path):
     url = "https://drive.google.com/uc?id=158WctWwqaNYxuuK4KGIll-VMx_4-DODZ"
     gdown.download(url, model_path, quiet=False)
 
-try:
-    resnet50v2_model = load_model(model_path)
-except Exception as e:
-    st.error(f"Erreur lors du chargement du modèle : {e}")
-    resnet50v2_model = None
-    st.stop()
+resnet50v2_model = load_model(model_path)
 
 # 🔹 Classes de sortie du modèle
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
@@ -36,9 +31,9 @@ class_labels = ['AHB', 'HMI', 'MI', 'Normal']
 api_key = st.secrets["GEMINI_API_KEY"]
 if api_key is None:
     raise ValueError("GEMINI_API_KEY is not set in environment variables")
-
 genai.configure(api_key=api_key)
 
+# 🔹 Configurer le modèle Gemini
 generation_config = {
     "temperature": 1,
     "top_p": 0.95,
@@ -56,14 +51,10 @@ model = genai.GenerativeModel(
 # 🔹 Prédiction avec ResNet
 # -----------------------------
 def predict_ecg_class(image_file):
+    global resnet50v2_model  # Corrige le NameError
     image = Image.open(image_file).convert('RGB').resize((224, 224))
     image_array = np.array(image) / 255.0
     image_array = np.expand_dims(image_array, axis=0)
-
-    if resnet50v2_model is None:
-        st.error("Le modèle n'est pas chargé.")
-        st.stop()
-
     prediction = resnet50v2_model.predict(image_array)
     predicted_class = class_labels[np.argmax(prediction)]
     return predicted_class
