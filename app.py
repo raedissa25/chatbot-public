@@ -16,7 +16,7 @@ model_path = "resnet50v2_ecg_best_model.h5"
 
 if not os.path.exists(model_path):
     file_id = "TON_FILE_ID"
-    url = f"https://drive.google.com/uc?id={file_id}"
+    url = f"https://drive.google.com/file/d/158WctWwqaNYxuuK4KGIll-VMx_4-DODZ/view?usp=drive_link"
     gdown.download(url, model_path, quiet=False)
 
 # Classes (à adapter selon ton dataset)
