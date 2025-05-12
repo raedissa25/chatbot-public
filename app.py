@@ -10,28 +10,33 @@ from dotenv import load_dotenv
 from tensorflow.keras.models import load_model
 import numpy as np
 import gdown
-import os
 
+# -----------------------------
+# 🔹 Charger le modèle ResNet50V2
+# -----------------------------
 model_path = "resnet50v2_ecg_best_model.h5"
 
 if not os.path.exists(model_path):
-    file_id = "TON_FILE_ID"
-    url = f"https://drive.google.com/file/d/158WctWwqaNYxuuK4KGIll-VMx_4-DODZ/view?usp=drive_link"
+    url = "https://drive.google.com/uc?id=158WctWwqaNYxuuK4KGIll-VMx_4-DODZ"
     gdown.download(url, model_path, quiet=False)
+
 resnet50v2_model = load_model(model_path)
-# Classes (à adapter selon ton dataset)
+
+# 🔹 Classes de sortie du modèle
 class_labels = ['AHB', 'HMI', 'MI', 'Normal']
 
-# Charger les variables d'environnement
+# -----------------------------
+# 🔹 Charger les variables d'environnement
+# -----------------------------
 load_dotenv("C:\\Users\\21629\\Desktop\\chatbot for image classification CNN(perfect finale)\\env")
-
-# Configurer le modèle d'IA
 api_key = os.getenv("GEMINI_API_KEY")
+
 if api_key is None:
     raise ValueError("GEMINI_API_KEY is not set in environment variables")
+
+# 🔹 Configurer le modèle Gemini
 genai.configure(api_key=api_key)
 
-# Paramètres du modèle
 generation_config = {
     "temperature": 1,
     "top_p": 0.95,
@@ -44,15 +49,21 @@ model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
     generation_config=generation_config,
 )
+
+# -----------------------------
+# 🔹 Prédiction avec ResNet
+# -----------------------------
 def predict_ecg_class(image_file):
-    image = Image.open(image_file).convert('RGB').resize((224, 224))  
+    image = Image.open(image_file).convert('RGB').resize((224, 224))
     image_array = np.array(image) / 255.0
-    image_array = np.expand_dims(image_array, axis=0)  
+    image_array = np.expand_dims(image_array, axis=0)
     prediction = resnet50v2_model.predict(image_array)
     predicted_class = class_labels[np.argmax(prediction)]
     return predicted_class
 
-# Fonction pour analyser une image ECG et générer un rapport
+# -----------------------------
+# 🔹 Générer le rapport ECG
+# -----------------------------
 def generate_ecg_details(ecg_image):
     image = Image.open(ecg_image)
     current_date = datetime.now().strftime('%Y-%m-%d')
@@ -122,7 +133,9 @@ def generate_ecg_details(ecg_image):
     response = chat_session.send_message([full_prompt, image])
     return response.text
 
-# Fonction pour créer un document Word contenant le rapport ECG
+# -----------------------------
+# 🔹 Générer un document Word
+# -----------------------------
 def create_doc(report_text, ecg_image):
     doc = Document()
     doc.add_heading('ECG ANALYSIS REPORT', 0)
@@ -146,11 +159,13 @@ def create_doc(report_text, ecg_image):
     file_stream.seek(0)
     return file_stream
 
-# Interface utilisateur avec Streamlit
+# -----------------------------
+# 🔹 Interface utilisateur Streamlit
+# -----------------------------
 def main():
     st.title("🫀Heart Health Chatbot - Get Instant ECG Analysis")
 
-    # Section Upload ECG
+    # Upload image
     st.header("Upload ECG Image")
     ecg_image = st.file_uploader("Upload an ECG Image", type=["png", "jpg", "jpeg"])
 
@@ -163,10 +178,8 @@ def main():
             st.header("Generated ECG Report")
             st.markdown(ecg_details)
 
-            # Stocker le rapport dans la session pour le téléchargement
             st.session_state.ecg_details = ecg_details
 
-        # Bouton de téléchargement du rapport
         if hasattr(st.session_state, 'ecg_details'):
             doc_file_stream = create_doc(st.session_state.ecg_details, ecg_image)
             st.download_button(
@@ -176,22 +189,19 @@ def main():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-    # Section Chatbot IA
-    st.header("Ask Your AI Cardiologist ")
+    # Chatbot
+    st.header("Ask Your AI Cardiologist")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Afficher l'historique du chat
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Saisie utilisateur
     user_input = st.chat_input("Ask me anything...")
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
-        
         with st.chat_message("user"):
             st.markdown(user_input)
 
@@ -201,7 +211,6 @@ def main():
             bot_response = response.text
 
         st.session_state.messages.append({"role": "assistant", "content": bot_response})
-
         with st.chat_message("assistant"):
             st.markdown(bot_response)
 
