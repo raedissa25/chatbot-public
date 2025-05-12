@@ -1,5 +1,7 @@
 streamlit
+tensorflow
 Pillow
+numpy
 python-docx
-google-generativeai
 python-dotenv
+google-generativeai
