@@ -140,7 +140,7 @@ def create_doc(report_text, ecg_image):
 
 # Interface utilisateur avec Streamlit
 def main():
-    st.title("🫀🫀Chatbot de santé cardiaque – Obtenez une analyse ECG instantanée")
+    st.title("🫀Chatbot de santé cardiaque – Obtenez une analyse ECG instantanée")
 
     # Section Upload ECG
     st.header("📂Téléverser l’image de l’ECG")
@@ -187,14 +187,14 @@ def main():
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        with st.spinner("Thinking..."):
+        with st.spinner("En réflexion..."):
             chat_session = model.start_chat(history=[])
             response = chat_session.send_message(user_input)
             bot_response = response.text
 
         st.session_state.messages.append({"role": "assistant", "content": bot_response})
 
-        with st.chat_message("En réflexion"):
+        with st.chat_message("assistant"):
             st.markdown(bot_response)
 
 if __name__ == '__main__':
