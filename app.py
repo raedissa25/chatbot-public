@@ -49,75 +49,75 @@ def generate_ecg_details(ecg_image):
     image = Image.open(ecg_image)
     current_date = datetime.now().strftime('%Y-%m-%d')
 
-    prompt = f"""Analyze this ECG image and provide a detailed report. Follow this structure:
+    prompt = f"""Analysez cette image ECG et fournissez un rapport détaillé. Suivez cette structure :
 
-**ECG ANALYSIS REPORT**
+**RAPPORT D'ANALYSE ECG**
 
-**1. PATIENT INFORMATION:**
-- Name:
+**1. Informations du patient:**
+- Nom:
 - Age:
-- Gender:
-- ID Number:
-- Date of ECG:
+- Sexe:
+- Numéro d'identification:
+- Date de l'ECG:
 
-**2. CLINICAL INFORMATION:**
-- Reason for ECG:
-- Relevant Medical History:
-- Medications:
+**2. Informations cliniques:**
+- Motif de l'ECG:
+- Antécédents médicaux pertinents:
+- Médicaments:
 
-**3. ECG TECHNICAL DETAILS:**
-- ECG Machine Used:
-- Lead Configuration:
+**3. DÉTAILS TECHNIQUES DE L’ECG:**
+- Appareil ECG utilisé:
+- Configuration des dérivations:
 - Calibration:
-- Recording Quality:
+- Qualité d'enregistrement:
 
-**4. ECG FINDINGS:**
-**Rhythm and Rate:**
-- Heart Rate:
-- Rhythm:
-- P Waves:
-- PR Interval:
-- QRS Complex:
-- QT/QTc Interval:
-- ST Segment:
-- T Waves:
+**4. Résultats de l'ECG:**
+**Rythme et fréquence:**
+- Fréquence cardiaque:
+- Rythme:
+- Ondes P:
+- Intervalle PR:
+- Complexe QRS:
+- Intervalle QT/QTc:
+- Segment ST:
+- Ondes T:
 
-**Axis:**
-- P Wave Axis:
-- QRS Axis:
-- T Wave Axis:
+**Axes:**
+- Axe des ondes P:
+- Axe du complexe QRS:
+- Axe des ondes T:
 
-**Conduction and Morphology:**
-- Atrial Conduction:
-- Ventricular Conduction:
-- QRS Morphology:
-- ST-T Changes:
+**Conduction et morphologie:**
+- Conduction atriale:
+- Conduction ventriculaire:
+- Morphologie du complexe QRS:
+- Modifications du segment ST-T:
 
 **5. INTERPRETATION:**
-- Normal or Abnormal:
-- Diagnosis/Findings:
-- Comparison with Previous ECG (if available):
+- Normal ou anormal:
+- Diagnostic / Résultats:
+- Comparaison avec l’ECG précédent (si disponible):
 
-**6. CONCLUSION AND RECOMMENDATIONS:**
-- Summary:
-- Recommendations:
+**6. CONCLUSION ET RECOMMANDATIONS:**
+- Résumé:
+- Recommandations:
 
-**7. REPORTING CARDIOLOGIST:**
-- Name:
-- Signature: Unable to provide signature for AI-generated report.
+**7. CARDIOLOGUE RÉDACTEUR DU RAPPORT:**
+- Nom:
+- Signature: Impossible de fournir une signature pour un rapport généré par IA.
 - Date of Report: {current_date}
 """
 
     chat_session = model.start_chat(history=[])
     predicted_class = predict_ecg_class(ecg_image)
-    full_prompt = prompt + f"\n\n**Anomaly Class (Predicted by Our Model):** {predicted_class}\n\nNow complete the rest of the report using the above prediction as reference."
+    full_prompt = prompt + f"\n\n**Classe d’anomalie (predite par notre modele Resnet50v2):** {predicted_class}\n\nNow complete the rest of the report using the above prediction as reference."
     response = chat_session.send_message([full_prompt, image])
     return response.text
 
 # Fonction pour créer un document Word contenant le rapport ECG
 def create_doc(report_text, ecg_image):
     doc = Document()
-    doc.add_heading('ECG ANALYSIS REPORT', 0)
+    doc.add_heading('RAPPORT D’ANALYSE DE L’ECG', 0)
 
     for line in report_text.split("\n"):
         if line.strip() == '':
@@ -140,19 +140,19 @@ def create_doc(report_text, ecg_image):
 
 # Interface utilisateur avec Streamlit
 def main():
-    st.title("🫀Heart Health Chatbot - Get Instant ECG Analysis")
+    st.title("🫀🫀Chatbot de santé cardiaque – Obtenez une analyse ECG instantanée")
 
     # Section Upload ECG
-    st.header("Upload ECG Image")
-    ecg_image = st.file_uploader("Upload an ECG Image", type=["png", "jpg", "jpeg"])
+    st.header("📂Téléverser l’image de l’ECG")
+    ecg_image = st.file_uploader("Téléversez une image de l’ECG", type=["png", "jpg", "jpeg"])
 
     if ecg_image is not None:
-        st.image(ecg_image, caption='Uploaded ECG Image', use_column_width=True)
+        st.image(ecg_image, caption='✅Image ECG téléversée', use_column_width=True)
 
-        if st.button("Generate ECG Report"):
-            with st.spinner("Analyzing ECG image..."):
+        if st.button("Génerer un rapport ECG"):
+            with st.spinner("🔍Analyse de l’image ECG..."):
                 ecg_details = generate_ecg_details(ecg_image)
-            st.header("Generated ECG Report")
+            st.header("📊Rapport ECG généré")
             st.markdown(ecg_details)
 
             # Stocker le rapport dans la session pour le téléchargement
@@ -162,14 +162,14 @@ def main():
         if hasattr(st.session_state, 'ecg_details'):
             doc_file_stream = create_doc(st.session_state.ecg_details, ecg_image)
             st.download_button(
-                label="Download ECG Report",
+                label="📥Télécharger le rapport ECG",
                 data=doc_file_stream,
                 file_name="ECG_Report.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
     # Section Chatbot IA
-    st.header("Ask Your AI Cardiologist ")
+    st.header("💬Posez votre question à votre cardiologue IA ")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -180,7 +180,7 @@ def main():
             st.markdown(message["content"])
 
     # Saisie utilisateur
-    user_input = st.chat_input("Ask me anything...")
+    user_input = st.chat_input("Posez votre question...")
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
         
@@ -194,7 +194,7 @@ def main():
 
         st.session_state.messages.append({"role": "assistant", "content": bot_response})
 
-        with st.chat_message("assistant"):
+        with st.chat_message("En réflexion"):
             st.markdown(bot_response)
 
 if __name__ == '__main__':
